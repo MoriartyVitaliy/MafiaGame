@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>МАФИЯ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="grain-overlay"></div>
+
+<!-- ===================== LOBBY ===================== -->
+<section id="screen-lobby" class="screen screen-center active">
+  <div class="folder">
+    <h1 class="case-title">МАФИЯ</h1>
+
+    <div class="field">
+      <label for="input-name">Ваше имя</label>
+      <input id="input-name" type="text" maxlength="20" placeholder="Дядя Толик" autocomplete="off" />
+    </div>
+
+    <button id="btn-create" class="btn btn-primary">Открыть новое дело</button>
+
+    <div class="divider"><span>и / или</span></div>
+
+    <div class="field">
+      <label for="input-code">Код дела</label>
+      <input id="input-code" type="text" maxlength="5" placeholder="AB12C" autocomplete="off" style="text-transform:uppercase" />
+    </div>
+    <button id="btn-join" class="btn btn-secondary">Присоединиться к расследованию</button>
+
+    <p id="lobby-error" class="error-text"></p>
+  </div>
+</section>
+
+<!-- ===================== WAITING ROOM ===================== -->
+<section id="screen-waiting" class="screen screen-center">
+  <div class="folder folder-wide">
+    <div class="folder-tab">ОЖИДАНИЕ</div>
+    <h2 class="case-title small">Явочная комната</h2>
+    <p class="case-subtitle">Код дела: <span id="room-code-display" class="mono code-big"></span> <button id="btn-copy-code" class="btn-copy" title="Скопировать">⧉</button></p>
+
+    <div id="waiting-players" class="suspects-grid"></div>
+
+    <!-- ---------------- HOST SETTINGS ---------------- -->
+    <div id="host-settings" class="settings-box">
+      <div class="settings-box-header">
+        <h3>Настройки дела</h3>
+        <span class="settings-badge" id="settings-badge">Только ведущий</span>
+      </div>
+
+      <div class="field">
+        <label>Таймер фаз</label>
+        <div class="toggle-row" id="timer-mode-row">
+          <button type="button" class="mode-btn active" data-mode="manual">Ручной</button>
+          <button type="button" class="mode-btn" data-mode="auto">Автоматический</button>
+        </div>
+      </div>
+
+      <div id="timer-durations" class="timer-durations">
+        <div class="field-inline">
+          <label for="dur-night">Ночь, сек</label>
+          <input type="number" id="dur-night" min="10" max="600" value="60" />
+        </div>
+        <div class="field-inline">
+          <label for="dur-day">День, сек</label>
+          <input type="number" id="dur-day" min="10" max="600" value="90" />
+        </div>
+        <div class="field-inline">
+          <label for="dur-voting">Голосование, сек</label>
+          <input type="number" id="dur-voting" min="10" max="300" value="45" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Количество мафии: <span id="mafia-count-label">1</span></label>
+        <input type="range" id="mafia-count" min="1" max="1" value="1" />
+      </div>
+
+      <div class="field role-toggle-row">
+        <label class="role-toggle"><input type="checkbox" id="role-doctor" checked /> Доктор</label>
+        <label class="role-toggle"><input type="checkbox" id="role-detective" checked /> Детектив</label>
+        <label class="role-toggle"><input type="checkbox" id="role-don" /> Дон</label>
+        <label class="role-toggle"><input type="checkbox" id="role-courtesan" /> Путана</label>
+        <label class="role-toggle"><input type="checkbox" id="role-maniac" /> Маньяк</label>
+      </div>
+
+
+
+
+
+      <p class="settings-summary" id="settings-summary"></p>
+    </div>
+
+    <p class="hint-text">Нужно минимум 4 следователя, чтобы начать. Роли распределятся случайно согласно настройкам.</p>
+    <button id="btn-start" class="btn btn-primary">Начать расследование</button>
+    <button id="btn-leave-waiting" class="btn btn-ghost">Покинуть комнату</button>
+    <p id="waiting-error" class="error-text"></p>
+  </div>
+</section>
+
+<!-- ===================== GAME ===================== -->
+<section id="screen-game" class="screen">
+  <div class="night-overlay" id="night-overlay"></div>
+
+  <header class="game-header">
+    <div class="phase-banner" id="phase-banner">
+      <span class="phase-label" id="phase-label">ДЕНЬ</span>
+      <span class="phase-round" id="phase-round">Раунд 1</span>
+    </div>
+    <div class="timer-wrap">
+      <div class="timer" id="phase-timer">00:00</div>
+      <button id="btn-advance-phase" class="btn-advance" style="display:none" title="Перейти к следующей фазе">➜</button>
+    </div>
+    <button id="btn-my-role" class="role-chip" title="Ваша роль">?</button>
+    <button id="btn-mute" class="mute-btn" title="Звук вкл/выкл">🔊</button>
+  </header>
+
+  <main class="game-main">
+    <p class="board-hint">Нажмите на портрет игрока, чтобы оставить о нём заметку — её видите только вы.</p>
+    <div class="suspects-grid" id="game-players"></div>
+
+    <div id="action-panel" class="action-panel"></div>
+  </main>
+
+  <aside class="transcript-panel" id="transcript-panel">
+    <button id="btn-toggle-chat" class="transcript-handle" title="Свернуть/развернуть стенограмму">
+      <span class="handle-arrow" id="handle-arrow">›</span>
+      <span class="handle-label">СТЕНОГРАММА</span>
+    </button>
+    <div class="transcript-header">СТЕНОГРАММА ПРОСЛУШКИ</div>
+    <div class="transcript-log" id="event-log"></div>
+    <div class="transcript-chat" id="chat-log"></div>
+    <form id="chat-form" class="chat-form">
+      <input id="chat-input" type="text" maxlength="300" placeholder="Сказать городу..." autocomplete="off" />
+      <button type="submit">➤</button>
+    </form>
+  </aside>
+</section>
+
+<!-- ===================== ROLE REVEAL MODAL ===================== -->
+<div id="role-modal" class="modal-backdrop">
+  <div class="stamp-card">
+    <div class="stamp-card-label">ВАША РОЛЬ В ДЕЛЕ</div>
+    <div class="stamp" id="role-stamp">МИРНЫЙ ЖИТЕЛЬ</div>
+    <p class="stamp-desc" id="role-desc"></p>
+    <div class="stamp-case">дело № <span id="role-case-number" class="mono"></span></div>
+    <button id="btn-close-role" class="btn btn-secondary">Понятно</button>
+  </div>
+</div>
+
+<!-- ===================== NOTES MODAL (NEW) ===================== -->
+<div id="notes-modal" class="modal-backdrop">
+  <div class="notes-card">
+    <div class="notes-card-header">
+      <div class="notes-subject">
+        <div class="notes-subject-avatar" id="notes-subject-avatar"></div>
+        <div>
+          <div class="notes-card-label">ЛИЧНАЯ ЗАМЕТКА</div>
+          <div class="notes-subject-name" id="notes-subject-name">Игрок</div>
+        </div>
+      </div>
+      <button id="btn-close-notes" class="notes-close" title="Закрыть">✕</button>
+    </div>
+    <textarea id="notes-textarea" class="notes-textarea" maxlength="500" placeholder="Что вы подозреваете? Как голосовал, что говорил, кому подыгрывал..."></textarea>
+    <div class="notes-card-footer">
+      <span class="notes-hint">Видно только вам · сохраняется автоматически</span>
+      <button id="btn-notes-clear" class="btn-notes-clear">Очистить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== GAME OVER MODAL ===================== -->
+<div id="gameover-modal" class="modal-backdrop">
+  <div class="stamp-card">
+    <div class="stamp-card-label">ВЕРДИКТ</div>
+    <div class="stamp" id="verdict-stamp">ГОРОД СПАСЁН</div>
+    <div id="reveal-list" class="reveal-list"></div>
+    <button id="btn-new-game" class="btn btn-primary">Вернуться в лобби</button>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/avatars.js"></script>
+<script src="/sounds.js"></script>
+<script src="/client.js"></script>
+</body>
+</html>
