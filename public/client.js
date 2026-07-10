@@ -1,6 +1,7 @@
 const socket = io();
 
 let previousAliveById = {};
+let notesTargetId = null;
 
 const ROLE_INFO = {
   mafia: {
@@ -46,6 +47,45 @@ const DEFAULT_SETTINGS = {
   timer: { mode: 'manual', night: 60, day: 90, voting: 45 },
 };
 
+function loadAllNotes() {
+  try { return JSON.parse(localStorage.getItem('mafia:notes') || '{}'); }
+  catch (e) { return {}; }
+}
+
+function saveNote(targetId, text) {
+  try {
+    const notes = loadAllNotes();
+    if (text) notes[targetId] = text;
+    else delete notes[targetId];
+    localStorage.setItem('mafia:notes', JSON.stringify(notes));
+  } catch (e) { /* ignore */ }
+}
+
+function openNotesFor(player) {
+  notesTargetId = player.id;
+  document.getElementById('notes-subject-name').textContent = player.name;
+  document.getElementById('notes-subject-avatar').innerHTML = renderAvatar(player.id, player.name);
+  const notes = loadAllNotes();
+  document.getElementById('notes-textarea').value = notes[player.id] || '';
+  openModal('notes-modal');
+  document.getElementById('notes-textarea').focus();
+}
+
+document.getElementById('notes-textarea').addEventListener('input', (e) => {
+  if (!notesTargetId) return;
+  saveNote(notesTargetId, e.target.value.trim());
+});
+
+document.getElementById('btn-notes-clear').addEventListener('click', () => {
+  document.getElementById('notes-textarea').value = '';
+  if (notesTargetId) saveNote(notesTargetId, '');
+});
+
+document.getElementById('btn-close-notes').addEventListener('click', () => {
+  closeModal('notes-modal');
+  notesTargetId = null;
+});
+
 // ---------- устойчивая сессия для переживания перезагрузки ----------
 function getSessionId() {
   try {
@@ -88,6 +128,7 @@ let hasActedThisPhase = false;
 let countdownInterval = null;
 let lastDetectiveResult = null;
 let lastDonResult = null;
+let lastMafiaChoiceName = null;
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
@@ -359,7 +400,7 @@ function renderGameScreen(state) {
   if (renderGameScreen.lastPhase !== state.phase || renderGameScreen.lastNightTurn !== state.nightTurn) {
     hasActedThisPhase = false;
     if (renderGameScreen.lastPhase !== state.phase) {
-      if (state.phase === 'night') { lastDetectiveResult = null; lastDonResult = null; Sfx.nightStart(); }
+      if (state.phase === 'night') { lastDetectiveResult = null; lastDonResult = null; lastMafiaChoiceName = null; Sfx.nightStart(); }
       else if (state.phase === 'day') Sfx.dayStart();
       else if (state.phase === 'voting') Sfx.votingStart();
     }
@@ -412,6 +453,10 @@ function renderGameScreen(state) {
       ${p.alive && p.connected === false ? '<div class="suspect-offline-tag">Нет связи</div>' : ''}
     `;
     grid.appendChild(card);
+    card.addEventListener('click', () => {
+      if (!p.alive) return;
+      openNotesFor(p);
+    });
   });
 
   const me = state.players.find((p) => p.id === mySessionId);
@@ -504,6 +549,8 @@ function renderActionPanel(state, me) {
       } else if (myRole === 'don' && state.nightTurn === 'don' && lastDonResult) {
         const { name, isDetective } = lastDonResult;
         panel.innerHTML = `<h3>Результат проверки</h3><p><strong>${escapeHtml(name)}</strong> — ${isDetective ? '<span style="color:var(--rose-bright)">это детектив!</span>' : 'не детектив.'}</p>`;
+      } else if ((myRole === 'mafia' || myRole === 'don') && state.nightTurn === 'mafia' && lastMafiaChoiceName) {
+        panel.innerHTML = `<h3>Выбор сделан</h3><p>Вы указали на <strong>${escapeHtml(lastMafiaChoiceName)}</strong>. Ждём остальных мафиози.</p>`;
       } else {
         panel.innerHTML = '<h3>Действие принято</h3><p>Ждём остальных участников ночи.</p>';
       }
@@ -538,11 +585,8 @@ function renderActionPanel(state, me) {
       el.addEventListener('click', () => {
         socket.emit('nightAction', { code: myRoomCode, targetId: p.id });
         const isGroupKillTurn = (myRole === 'mafia' || myRole === 'don') && state.nightTurn === 'mafia';
-        if (!isGroupKillTurn) hasActedThisPhase = true;
-        else {
-          list.querySelectorAll('.suspect-card').forEach((c) => c.classList.remove('is-chosen'));
-          el.classList.add('is-chosen');
-        }
+        hasActedThisPhase = true;
+        if (isGroupKillTurn) lastMafiaChoiceName = p.name;
         renderActionPanel(state, me);
       });
       list.appendChild(el);
@@ -692,11 +736,13 @@ requestAnimationFrame(animateNightLight);
 // ---------- Collapsible transcript panel ----------
 const transcriptPanel = document.getElementById('transcript-panel');
 const toggleChatBtn = document.getElementById('btn-toggle-chat');
+const transcriptBackdrop = document.getElementById('transcript-backdrop');
 
 function setChatCollapsed(collapsed) {
   transcriptPanel.classList.toggle('collapsed', collapsed);
   document.body.classList.toggle('chat-collapsed', collapsed);
   toggleChatBtn.setAttribute('aria-expanded', String(!collapsed));
+  if (transcriptBackdrop) transcriptBackdrop.classList.toggle('on', !collapsed);
   try { localStorage.setItem('mafia:chatCollapsed', collapsed ? '1' : '0'); } catch (e) { /* ignore */ }
 }
 
@@ -704,8 +750,16 @@ toggleChatBtn.addEventListener('click', () => {
   setChatCollapsed(!transcriptPanel.classList.contains('collapsed'));
 });
 
+// тап по затемнённому фону тоже закрывает панель
+transcriptBackdrop?.addEventListener('click', () => setChatCollapsed(true));
+
 try {
-  if (localStorage.getItem('mafia:chatCollapsed') === '1') {
+  const saved = localStorage.getItem('mafia:chatCollapsed');
+  if (saved === '1') {
+    setChatCollapsed(true);
+  } else if (saved === null && window.matchMedia('(max-width: 859px)').matches) {
+    // на мобильных по умолчанию свёрнуто — иначе при первом входе панель
+    // сразу перекроет весь экран затемнением
     setChatCollapsed(true);
   }
 } catch (e) { /* ignore */ }

@@ -751,6 +751,112 @@ button:focus-visible, input:focus-visible {
 }
 .chat-form button:hover { filter: brightness(1.1); }
 
+
+/* ---------------- Личные заметки об игроке ---------------- */
+.notes-card {
+  background: linear-gradient(180deg, var(--paper-3), var(--paper-2));
+  color: var(--ink);
+  max-width: 420px;
+  width: 100%;
+  padding: 26px 26px 22px;
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 34px 80px rgba(0,0,0,0.5),
+    0 1px 0 rgba(255,255,255,0.4) inset,
+    0 0 0 1px var(--panel-edge);
+  animation: riseIn 0.35s ease-out;
+}
+
+.notes-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.notes-subject {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.notes-subject-avatar {
+  width: 44px; height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px #6d5a35, 0 3px 8px rgba(0,0,0,0.3);
+}
+.notes-subject-avatar svg { width: 100%; height: 100%; display: block; }
+.notes-card-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+}
+.notes-subject-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notes-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--ink-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.notes-close:hover { background: rgba(0,0,0,0.06); color: var(--ink); }
+
+.notes-textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1.5px solid #d8c79a;
+  background: #fffdf6;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  border-radius: var(--radius-sm);
+}
+.notes-textarea:focus {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 3px rgba(198,160,92,0.25);
+  outline: none;
+}
+
+.notes-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+.notes-hint { font-size: 11px; color: var(--ink-muted); }
+.btn-notes-clear {
+  background: none;
+  border: none;
+  color: var(--rose);
+  font-size: 12px;
+  text-decoration: underline;
+  padding: 6px 4px; /* чуть больше зона тапа для мобильных */
+}
+.btn-notes-clear:hover { color: var(--rose-bright); }
+
+/* Курсор-подсказка на карточках игроков, что по ним можно кликнуть для заметки */
+#game-players .suspect-card { cursor: pointer; }
+
+
 @media (min-width: 860px) {
   .game-main { margin-right: 320px; }
   .game-header { margin-right: 320px; }
@@ -821,33 +927,164 @@ button:focus-visible, input:focus-visible {
 .reveal-role-town { color: var(--sage); font-weight: 700; }
 .reveal-role-maniac { color: var(--violet-bright); font-weight: 700; } /* NEW */
 
+.transcript-backdrop { display: none; }
+ 
 @media (max-width: 859px) {
+  /* ---- Стенограмма как боковой drawer поверх контента ---- */
   .transcript-panel {
-    position: static;
-    width: 100%;
-    height: 260px;
-    border-left: none;
-    border-top: 1px solid var(--panel-edge);
-    transform: none;
-    transition: height 0.3s ease;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(88vw, 340px);
+    height: auto;
+    border-left: 1px solid var(--panel-edge);
+    border-top: none;
+    /* видна только узкая "ручка" слева от панели — та же техника, что на десктопе,
+       просто панель теперь fixed и не толкает контент */
+    transform: translateX(calc(100% - 44px));
+    transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: -14px 0 34px rgba(0,0,0,0.45);
+    z-index: 60;
   }
-  .transcript-panel.collapsed { height: 46px; overflow: hidden; }
-  .transcript-panel.collapsed .transcript-log,
-  .transcript-panel.collapsed .transcript-chat,
-  .transcript-panel.collapsed .chat-form { display: none; }
+  .transcript-panel.collapsed { transform: translateX(calc(100% - 44px)); }
+  .transcript-panel:not(.collapsed) { transform: translateX(0); }
+ 
+  /* ручка увеличена под палец */
   .transcript-handle {
-    position: static;
-    width: 100%;
-    height: 46px;
-    flex-direction: row;
-    border-radius: 0;
-    border: none;
-    border-bottom: 1px solid var(--panel-edge);
+    width: 44px;
+    height: 88px;
+  }
+ 
+  /* контент экрана больше никогда не подвинется на мобильных */
+  .game-main, .game-header { margin-right: 0; }
+ 
+  /* чуть крупнее шрифт стенограммы — панель теперь уже, читать удобнее с крупным текстом */
+  .transcript-log, .chat-form input { font-size: 13px; }
+  .transcript-chat { font-size: 14px; }
+ 
+  /* полупрозрачная подложка, гасит остальной экран, пока панель раскрыта */
+  .transcript-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 6, 9, 0.55);
+    z-index: 55;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .transcript-backdrop.on {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* ==========================================================================
+   MOBILE ADAPTIVE ADDITIONS
+   ========================================================================== */
+
+html, body {
+  height: 100%;
+}
+.screen-center {
+  min-height: 100svh;
+}
+#screen-game {
+  min-height: 100svh;
+}
+
+.game-header {
+  padding-top: calc(14px + env(safe-area-inset-top));
+  padding-left: calc(20px + env(safe-area-inset-left));
+  padding-right: calc(20px + env(safe-area-inset-right));
+}
+.chat-form {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+.screen-center {
+  padding-top: calc(24px + env(safe-area-inset-top));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 640px) {
+  .folder {
+    padding: 34px 22px 26px;
+    border-radius: var(--radius-md);
+  }
+  .case-title { font-size: 30px; }
+  .case-title.small { font-size: 20px; }
+
+  .suspects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 9px;
+  }
+  .suspect-card { padding: 11px 6px 9px; }
+  .suspect-avatar { width: 38px; height: 38px; }
+  .suspect-name { font-size: 12px; }
+
+  .game-header {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    padding-bottom: 10px;
+  }
+  .phase-banner {
+    flex-basis: 100%;
     order: -1;
   }
-  .handle-arrow { transform: rotate(90deg); }
-  .transcript-panel.collapsed .handle-arrow { transform: rotate(-90deg); }
-  .handle-label { writing-mode: horizontal-tb; transform: none; }
-  .transcript-header { padding-left: 18px; }
-  #screen-game { display: flex; flex-direction: column; }
+  .phase-label { font-size: 16px; }
+  .timer { font-size: 17px; padding: 5px 11px; }
+  .role-chip, .mute-btn, .btn-advance {
+    width: 36px; height: 36px; font-size: 14px;
+  }
+
+  .stamp-card, .notes-card {
+    padding: 26px 18px;
+  }
+  .stamp { font-size: 19px; padding: 11px 16px; }
+  .stamp-desc { font-size: 13.5px; }
+
+  .settings-box { padding: 14px 14px 6px; }
+  .role-toggle-row { gap: 12px 16px; }
+  .role-toggle { font-size: 12.5px; }
+  .role-toggle input[type="checkbox"] {
+    width: 16px; height: 16px; min-width: 16px;
+  }
+  .role-toggle input[type="checkbox"]:checked::after {
+    left: 5px; top: 2px; width: 4px; height: 8px;
+  }
+
+  .timer-durations { gap: 8px; }
+  .field-inline { min-width: 74px; }
+}
+
+@media (max-width: 380px) {
+  .case-title { font-size: 25px; }
+  .folder { padding: 28px 16px 22px; }
+
+  .suspects-grid {
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 7px;
+  }
+  .suspect-avatar { width: 32px; height: 32px; }
+  .suspect-name { font-size: 11px; }
+  .suspect-case { font-size: 9.5px; }
+
+  .game-header { padding-left: 12px; padding-right: 12px; }
+  .game-main { padding: 16px 12px 30px; }
+
+  .btn { font-size: 12.5px; padding: 12px 14px; }
+
+  .role-toggle-row { gap: 10px 12px; }
+  .timer-durations { flex-direction: column; }
+  .field-inline { width: 100%; }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .mute-btn, .role-chip, .btn-advance {
+    width: 44px; height: 44px;
+  }
+  .btn-copy { padding: 6px; }
+  .suspect-card.is-selectable { min-height: 60px; }
 }
