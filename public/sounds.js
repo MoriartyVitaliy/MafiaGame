@@ -1,5 +1,3 @@
-// Звуковые эффекты, синтезированные через Web Audio API — без внешних файлов.
-
 const Sfx = (() => {
   let ctx = null;
   let muted = false;

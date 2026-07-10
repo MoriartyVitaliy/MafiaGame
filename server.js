@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -13,30 +12,29 @@ app.use(express.static(path.join(__dirname, 'public')));
 // player = { sessionId, socketId, name, role, alive, caseNumber, connected, disconnectTimer }
 // room.hostId хранит sessionId хоста (не socket.id!)
 const rooms = {};
-
 const NIGHT_DURATION = 35;
 const DAY_DURATION = 75;
 const VOTING_DURATION = 30;
-const LAST_WORD_DURATION = 25; // NEW: сколько секунд длится последнее слово в авто-режиме
-const DISCONNECT_GRACE_MS = 45000; // время на реконнект/перезагрузку страницы
+const LAST_WORD_DURATION = 25;
+const DISCONNECT_GRACE_MS = 45000;
 
 const TURN_ANNOUNCE = {
-  courtesanStart: 'Путана, откройте глаза и выберите, кого навестить этой ночью.', // NEW
-  courtesanEnd:   'Путана, закройте глаза.', // NEW
+  courtesanStart: 'Путана, откройте глаза и выберите, кого навестить этой ночью.',
+  courtesanEnd:   'Путана, закройте глаза.',
   mafiaStart: 'Город засыпает. Мафия, откройте глаза и выберите жертву.',
   mafiaEnd:   'Мафия, закройте глаза.',
-  donStart: 'Дон, откройте глаза и укажите, кого хотите проверить на детектива.', // NEW
-  donEnd:   'Дон, закройте глаза.', // NEW
+  donStart: 'Дон, откройте глаза и укажите, кого хотите проверить на детектива.',
+  donEnd:   'Дон, закройте глаза.',
   detectiveStart: 'Детектив, откройте глаза и укажите на подозреваемого.',
   detectiveEnd:   'Детектив, закройте глаза.',
   doctorStart: 'Доктор, откройте глаза и выберите, кого спасти.',
   doctorEnd:   'Доктор, закройте глаза.',
-  maniacStart: 'Маньяк, откройте глаза и выберите свою жертву.', // NEW
-  maniacEnd:   'Маньяк, закройте глаза.', // NEW
+  maniacStart: 'Маньяк, откройте глаза и выберите свою жертву.',
+  maniacEnd:   'Маньяк, закройте глаза.',
   nightEnd: 'Город просыпается.',
 };
 
-// NEW: роли, входящие в мафиозную фракцию (для победы/подсчёта)
+
 const MAFIA_FACTION_ROLES = ['mafia', 'don'];
 
 function genRoomCode() {
@@ -56,14 +54,13 @@ function aliveByRole(room, role) {
   return alivePlayers(room).filter((p) => p.role === role);
 }
 
-// NEW: живые игроки мафиозной фракции (обычная мафия + дон)
 function aliveMafiaFaction(room) {
   return alivePlayers(room).filter((p) => MAFIA_FACTION_ROLES.includes(p.role));
 }
 
 function publicPlayerList(room) {
   return room.players.map((p) => ({
-    id: p.sessionId, // стабильный публичный id — переживает реконнект
+    id: p.sessionId,
     name: p.name,
     alive: p.alive,
     caseNumber: p.caseNumber,
@@ -84,15 +81,10 @@ function broadcastRoom(room, extra = {}) {
     phaseEndsAt: room.phaseEndsAt || null,
     nightTurn: room.phase === 'night' && room.night ? room.night.currentTurn || null : null,
     settings: room.settings,
-    // NEW: видимость голосования — кто за кого голосует (sessionId -> sessionId | 'skip')
     dayVotes: room.dayVotes || {},
-    // NEW: если задано — голосовать можно только за этих (переголосование при ничьей)
     voteCandidates: room.voteCandidates || null,
-    // NEW: номер раунда голосования в текущем дне (1 = обычное, 2+ = переголосование)
     voteRound: room.voteRound || 1,
-    // NEW: кто сейчас говорит последнее слово
     lastWordTarget: room.phase === 'lastword' ? room.lastWordTarget : null,
-    // NEW: порядок выступления на день, сдвигается на +1 каждую ночь
     speakOrder: room.speakOrder || null,
     ...extra,
   });
@@ -140,13 +132,11 @@ function assignRoles(room) {
     if (n >= 9) mafiaCount = Math.max(mafiaCount, 2);
   }
 
-  // NEW: если урезать роли придётся при нехватке мест — сначала режем рядовую мафию,
-  // уникальные роли (дон/доктор/детектив/путана/маньяк) стараемся сохранить как есть
   let uniqueSpecial = (doctorOn ? 1 : 0) + (detectiveOn ? 1 : 0) + (courtesanOn ? 1 : 0) + (donOn ? 1 : 0) + (maniacOn ? 1 : 0);
   if (mafiaCount + uniqueSpecial > n) {
     mafiaCount = Math.max(0, n - uniqueSpecial);
   }
-  // если даже без рядовой мафии уникальных ролей больше, чем игроков — режем по приоритету
+
   if (uniqueSpecial > n) {
     const priority = ['don', 'doctor', 'detective', 'courtesan', 'maniac'];
     const flags = { don: donOn, doctor: doctorOn, detective: detectiveOn, courtesan: courtesanOn, maniac: maniacOn };
@@ -161,11 +151,11 @@ function assignRoles(room) {
 
   let idx = 0;
   for (let i = 0; i < mafiaCount && idx < n; i++) shuffled[idx++].role = 'mafia';
-  if (donOn && idx < n) shuffled[idx++].role = 'don'; // NEW: глава мафии, отдельная роль
+  if (donOn && idx < n) shuffled[idx++].role = 'don';
   if (doctorOn && idx < n) shuffled[idx++].role = 'doctor';
   if (detectiveOn && idx < n) shuffled[idx++].role = 'detective';
-  if (courtesanOn && idx < n) shuffled[idx++].role = 'courtesan'; // NEW
-  if (maniacOn && idx < n) shuffled[idx++].role = 'maniac'; // NEW
+  if (courtesanOn && idx < n) shuffled[idx++].role = 'courtesan';
+  if (maniacOn && idx < n) shuffled[idx++].role = 'maniac';
   for (; idx < n; idx++) shuffled[idx].role = 'civilian';
 
   room.players.forEach((p) => {
@@ -174,18 +164,17 @@ function assignRoles(room) {
   });
 }
 
-// NEW: теперь три исхода — город, мафия (мафия+дон) или маньяк-одиночка
 function checkWinCondition(room) {
   const alive = alivePlayers(room);
   const aliveManiac = alive.filter((p) => p.role === 'maniac').length;
   const aliveMafia = aliveMafiaFaction(room).length;
   const aliveTown = alive.length - aliveManiac - aliveMafia;
 
-  // Маньяк побеждает, если остаётся единственным живым участником
+
   if (aliveManiac > 0 && alive.length === aliveManiac) return 'maniac';
-  // Город побеждает, только когда устранены и мафия, и маньяк
+
   if (aliveMafia === 0 && aliveManiac === 0) return 'town';
-  // Мафия побеждает, когда её численность не уступает всем остальным вместе взятым
+
   if (aliveMafia > 0 && aliveMafia >= aliveTown + aliveManiac) return 'mafia';
   return null;
 }
@@ -204,8 +193,6 @@ function endGame(room, winner) {
   broadcastRoom(room);
 }
 
-// NEW: путана блокирует до убийства мафии, дон проверяет отдельно от общего голосования мафии,
-// маньяк действует последним и независимо от всех
 function nightOrder(room) {
   const order = [];
   if (aliveByRole(room, 'courtesan').length) order.push('courtesan');
@@ -228,7 +215,6 @@ function isAutoTimer(room) {
   return !!(room.settings && room.settings.timer && room.settings.timer.mode === 'auto');
 }
 
-// NEW: порядок выступления на день — все живые игроки, начиная со сдвигом +1 каждый раунд (каждую ночь)
 function computeSpeakOrder(room) {
   const alive = alivePlayers(room);
   if (alive.length === 0) return [];
@@ -246,8 +232,8 @@ function startNight(room) {
   room.night = {
     mafiaVotes: {},
     doctorSave: null,
-    blockedSessionId: null, // NEW: цель путаны — не может действовать этой ночью
-    maniacTarget: null, // NEW: жертва маньяка
+    blockedSessionId: null,
+    maniacTarget: null,
     order: nightOrder(room),
     turnIndex: -1,
     currentTurn: null,
@@ -257,7 +243,6 @@ function startNight(room) {
   advanceNightTurn(room);
 }
 
-// NEW: проверяет, есть ли у роли хоть один живой участник, не заблокированный путаной
 function roleHasActiveActor(room, role) {
   const actors = role === 'mafia' ? aliveMafiaFaction(room) : aliveByRole(room, role);
   return actors.some((p) => p.sessionId !== room.night.blockedSessionId);
@@ -269,7 +254,6 @@ function advanceNightTurn(room) {
   room.night.turnIndex += 1;
   let role = room.night.order[room.night.turnIndex];
 
-  // NEW: если все участники этой роли заблокированы путаной — пропускаем ход молча
   while (role && !roleHasActiveActor(room, role)) {
     io.to(room.code).emit('announce', TURN_ANNOUNCE[`${role}Start`]);
     io.to(room.code).emit('announce', 'Кто-то этой ночью не смог встать с постели...');
@@ -303,8 +287,7 @@ function advanceNightTurn(room) {
 function resolveNight(room) {
   if (room.phase !== 'night') return;
 
-  // ---- жертва мафии/дона ----
-  const votes = Object.values(room.night.mafiaVotes); // значения — sessionId цели
+  const votes = Object.values(room.night.mafiaVotes);
   let mafiaVictimId = null;
   if (votes.length > 0) {
     const tally = {};
@@ -317,7 +300,6 @@ function resolveNight(room) {
     mafiaVictimId = 'SAVED';
   }
 
-  // NEW: жертва маньяка — действует независимо от мафии
   let maniacVictimId = room.night.maniacTarget || null;
   if (maniacVictimId && maniacVictimId === room.night.doctorSave) {
     maniacVictimId = 'SAVED';
@@ -360,7 +342,7 @@ function resolveNight(room) {
 function startDay(room) {
   room.phase = 'day';
   room.introDay = false;
-  room.speakOrder = computeSpeakOrder(room); // NEW: пересчитываем порядок выступления, сдвинутый на +1
+  room.speakOrder = computeSpeakOrder(room);
   pushLog(room, '— День. Город обсуждает случившееся. —');
   scheduleAutoAdvance(room, 'day', () => startVoting(room));
   broadcastRoom(room);
@@ -369,7 +351,7 @@ function startDay(room) {
 function startIntroDay(room) {
   room.phase = 'day';
   room.introDay = true;
-  room.speakOrder = computeSpeakOrder(room); // NEW
+  room.speakOrder = computeSpeakOrder(room);
   pushLog(room, '— Первый день. Познакомьтесь и обсудите стратегию — сегодня без голосования. —');
   scheduleAutoAdvance(room, 'day', () => {
     room.introDay = false;
@@ -378,7 +360,6 @@ function startIntroDay(room) {
   broadcastRoom(room);
 }
 
-// NEW: startVoting теперь умеет запускать переголосование среди ограниченного списка кандидатов
 function startVoting(room, opts = {}) {
   room.phase = 'voting';
   room.introDay = false;
@@ -413,7 +394,6 @@ function scheduleAutoAdvance(room, key, onExpire) {
   }
 }
 
-// NEW: последнее слово перед тем, как решение города вступит в силу
 function startLastWord(room, targetSessionId) {
   const target = findPlayerBySession(room, targetSessionId);
   room.phase = 'lastword';
@@ -431,7 +411,6 @@ function startLastWord(room, targetSessionId) {
   }
 }
 
-// NEW: приводит в исполнение решение города после последнего слова
 function finalizeElimination(room) {
   if (room.phase !== 'lastword') return;
   clearTimeout(room.timer);
@@ -473,7 +452,6 @@ function resolveVoting(room) {
     }
   }
 
-  // NEW: ничья голосов -> переголосование (один раз), при повторной ничьей — без изгнания
   if (tie) {
     if ((room.voteRound || 1) >= 2) {
       pushLog(room, 'Повторная ничья голосов — город так и не пришёл к решению.');
@@ -489,7 +467,6 @@ function resolveVoting(room) {
   }
 
   if (eliminatedSessionId) {
-    // NEW: перед изгнанием даём последнее слово
     startLastWord(room, eliminatedSessionId);
     return;
   }
@@ -506,7 +483,6 @@ function findRoomBySocket(socketId) {
   return Object.values(rooms).find((r) => r.players.some((p) => p.socketId === socketId));
 }
 
-// Удаляет игрока насовсем (истёк grace-период или явный выход)
 function removePlayer(room, sessionId, logText) {
   const idx = room.players.findIndex((p) => p.sessionId === sessionId);
   if (idx === -1) return;
@@ -519,14 +495,15 @@ function removePlayer(room, sessionId, logText) {
     delete rooms[room.code];
     return;
   }
+
   if (room.hostId === sessionId) {
     room.hostId = room.players[0].sessionId;
   }
-  // NEW: если ушедший был тем, кто держал последнее слово — сразу приводим решение в исполнение
+
   if (room.phase === 'lastword' && room.lastWordTarget === sessionId) {
-    room.phase = 'day'; // временно, чтобы finalizeElimination не вышел по guard'у не сработав
+    room.phase = 'day';
     room.phase = 'lastword';
-    room.lastWordTarget = null; // цель уже покинула комнату — просто продолжаем ночь
+    room.lastWordTarget = null;
     clearTimeout(room.timer);
     room.dayVotes = {};
     room.voteCandidates = null;
@@ -567,13 +544,13 @@ io.on('connection', (socket) => {
       log: [],
       night: {},
       dayVotes: {},
-      voteCandidates: null, // NEW
-      voteRound: 1, // NEW
-      lastWordTarget: null, // NEW
-      speakOrder: null, // NEW
+      voteCandidates: null,
+      voteRound: 1,
+      lastWordTarget: null,
+      speakOrder: null,
       settings: {
         mafiaCount: 1,
-        roles: { doctor: true, detective: true, courtesan: false, don: false, maniac: false }, // NEW
+        roles: { doctor: true, detective: true, courtesan: false, don: false, maniac: false },
         timer: { mode: 'manual', night: 60, day: 90, voting: 45 },
       },
     };
@@ -588,7 +565,6 @@ io.on('connection', (socket) => {
     const room = rooms[(code || '').toUpperCase()];
     if (!room) return socket.emit('errorMsg', 'Комната не найдена. Проверьте код.');
 
-    // Если этот sessionId уже есть в комнате (двойной клик/повторная вкладка) — просто переподключаем
     const existing = findPlayerBySession(room, sessionId);
     if (existing) {
       clearTimeout(existing.disconnectTimer);
@@ -622,7 +598,6 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   });
 
-  // Реконнект после перезагрузки страницы: клиент шлёт сохранённые code+sessionId
   socket.on('rejoinRoom', ({ code, sessionId }) => {
     const room = rooms[(code || '').toUpperCase()];
     if (!room) return socket.emit('rejoinFailed');
@@ -677,9 +652,9 @@ io.on('connection', (socket) => {
       roles: {
         doctor: !!settings?.roles?.doctor,
         detective: !!settings?.roles?.detective,
-        courtesan: !!settings?.roles?.courtesan, // NEW
-        don: !!settings?.roles?.don, // NEW
-        maniac: !!settings?.roles?.maniac, // NEW
+        courtesan: !!settings?.roles?.courtesan,
+        don: !!settings?.roles?.don,
+        maniac: !!settings?.roles?.maniac,
       },
       timer: {
         mode: settings?.timer?.mode === 'auto' ? 'auto' : 'manual',
@@ -697,54 +672,60 @@ io.on('connection', (socket) => {
     const player = findPlayerBySocket(room, socket.id);
     if (!player || !player.alive) return;
 
-    // NEW: определяем, к какому "ходу" относится роль игрока (дон делит ход убийства с мафией)
     const turnKeyForRole = player.role === 'don' && room.night.currentTurn === 'mafia' ? 'mafia' : player.role;
     if (room.night.currentTurn !== turnKeyForRole) return;
 
-    // NEW: заблокированный путаной игрок не может действовать этой ночью
+
     if (room.night.blockedSessionId === player.sessionId) {
       socket.emit('actionAck', { message: 'Этой ночью кто-то помешал вам действовать...' });
       return;
     }
 
     if (player.role === 'mafia' || (player.role === 'don' && room.night.currentTurn === 'mafia')) {
-      // Мафия и дон вместе голосуют за жертву
+
       room.night.mafiaVotes[player.sessionId] = targetId;
       const activeVoters = aliveMafiaFaction(room).filter((p) => p.sessionId !== room.night.blockedSessionId).map((p) => p.sessionId);
       const allVoted = activeVoters.every((sid) => room.night.mafiaVotes[sid]);
-      broadcastRoom(room); // NEW: остальным мафиози сразу видно, кто уже проголосовал
+      broadcastRoom(room); 
       if (allVoted) {
         io.to(room.code).emit('announce', TURN_ANNOUNCE.mafiaEnd);
         advanceNightTurn(room);
       }
     } else if (player.role === 'don' && room.night.currentTurn === 'don') {
-      // NEW: отдельная проверка дона — не детектив ли выбранный им игрок
+
       const target = findPlayerBySession(room, targetId);
       if (target) socket.emit('donResult', { targetId, name: target.name, isDetective: target.role === 'detective' });
       io.to(room.code).emit('announce', TURN_ANNOUNCE.donEnd);
       advanceNightTurn(room);
+
     } else if (player.role === 'doctor') {
+
       room.night.doctorSave = targetId;
       socket.emit('actionAck', { message: 'Вы выбрали, кого спасти этой ночью.' });
       io.to(room.code).emit('announce', TURN_ANNOUNCE.doctorEnd);
       advanceNightTurn(room);
+
     } else if (player.role === 'detective') {
+
       const target = findPlayerBySession(room, targetId);
       if (target) socket.emit('detectiveResult', { targetId, name: target.name, isMafia: MAFIA_FACTION_ROLES.includes(target.role) });
       io.to(room.code).emit('announce', TURN_ANNOUNCE.detectiveEnd);
       advanceNightTurn(room);
+
     } else if (player.role === 'courtesan') {
-      // NEW: путана блокирует действие выбранного игрока этой ночью
+
       room.night.blockedSessionId = targetId;
       socket.emit('actionAck', { message: 'Вы навестили выбранного участника этой ночью.' });
       io.to(room.code).emit('announce', TURN_ANNOUNCE.courtesanEnd);
       advanceNightTurn(room);
+
     } else if (player.role === 'maniac') {
-      // NEW: маньяк выбирает жертву независимо от мафии
+      
       room.night.maniacTarget = targetId;
       socket.emit('actionAck', { message: 'Вы выбрали свою жертву этой ночью.' });
       io.to(room.code).emit('announce', TURN_ANNOUNCE.maniacEnd);
       advanceNightTurn(room);
+
     }
   });
 
@@ -753,13 +734,11 @@ io.on('connection', (socket) => {
     if (!room || room.phase !== 'voting') return;
     const player = findPlayerBySocket(room, socket.id);
     if (!player || !player.alive) return;
-    // NEW: во время переголосования разрешено голосовать только за кандидатов из ничьей
     if (room.voteCandidates && room.voteCandidates.length && targetId !== 'skip' && !room.voteCandidates.includes(targetId)) {
       return;
     }
     room.dayVotes[player.sessionId] = targetId;
     socket.emit('actionAck', { message: 'Ваш голос учтён.' });
-    // NEW: сразу транслируем всем, кто за кого проголосовал
     broadcastRoom(room);
 
     const aliveIds = alivePlayers(room).map((p) => p.sessionId);
@@ -773,7 +752,6 @@ io.on('connection', (socket) => {
     const player = findPlayerBySocket(room, socket.id);
     if (!player) return;
     if (room.phase === 'night') return;
-    // NEW: во время последнего слова говорить может только тот, кому дали слово
     if (room.phase === 'lastword' && player.sessionId !== room.lastWordTarget) return;
     const clean = String(text).slice(0, 300);
     io.to(room.code).emit('chatMessage', {
@@ -784,7 +762,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // NEW: тот, кому дали последнее слово, может завершить его досрочно
   socket.on('finishLastWord', ({ code }) => {
     const room = rooms[code];
     if (!room || room.phase !== 'lastword') return;
@@ -817,7 +794,6 @@ io.on('connection', (socket) => {
     } else if (room.phase === 'voting') {
       resolveVoting(room);
     } else if (room.phase === 'lastword') {
-      // NEW: ведущий может завершить последнее слово вручную
       finalizeElimination(room);
     }
   });

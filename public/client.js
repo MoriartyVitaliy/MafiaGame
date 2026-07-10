@@ -8,7 +8,7 @@ const ROLE_INFO = {
     css: 'role-mafia',
     desc: 'Каждую ночь вы выбираете жертву вместе с другими мафиози (и доном). Ваша цель — остаться незамеченными и устранить город.',
   },
-  don: { // NEW
+  don: {
     label: 'ДОН',
     css: 'role-mafia',
     desc: 'Вы — глава мафии. Голосуете за жертву вместе с мафией, а также отдельно можете проверить, не детектив ли выбранный вами подозреваемый.',
@@ -23,12 +23,12 @@ const ROLE_INFO = {
     css: 'role-town',
     desc: 'Каждую ночь вы проверяете одного подозреваемого и узнаёте, состоит ли он в мафии.',
   },
-  courtesan: { // NEW
+  courtesan: {
     label: 'ПУТАНА',
     css: 'role-town',
     desc: 'Каждую ночь вы навещаете одного из участников — он не сможет применить свою способность этой ночью.',
   },
-  maniac: { // NEW
+  maniac: {
     label: 'МАНЬЯК',
     css: 'role-maniac',
     desc: 'Вы играете сами за себя. Каждую ночь выбираете жертву. Вы побеждаете, если остаётесь единственным выжившим в городе.',
@@ -42,7 +42,7 @@ const ROLE_INFO = {
 
 const DEFAULT_SETTINGS = {
   mafiaCount: 1,
-  roles: { doctor: true, detective: true, courtesan: false, don: false, maniac: false }, // NEW
+  roles: { doctor: true, detective: true, courtesan: false, don: false, maniac: false },
   timer: { mode: 'manual', night: 60, day: 90, voting: 45 },
 };
 
@@ -87,7 +87,7 @@ let latestState = null;
 let hasActedThisPhase = false;
 let countdownInterval = null;
 let lastDetectiveResult = null;
-let lastDonResult = null; // NEW
+let lastDonResult = null;
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
@@ -214,9 +214,9 @@ function renderSettings(state, isHost) {
 
   document.getElementById('role-doctor').checked = !!roles.doctor;
   document.getElementById('role-detective').checked = !!roles.detective;
-  document.getElementById('role-courtesan').checked = !!roles.courtesan; // NEW
-  document.getElementById('role-don').checked = !!roles.don; // NEW
-  document.getElementById('role-maniac').checked = !!roles.maniac; // NEW
+  document.getElementById('role-courtesan').checked = !!roles.courtesan;
+  document.getElementById('role-don').checked = !!roles.don;
+  document.getElementById('role-maniac').checked = !!roles.maniac;
 
   document.querySelectorAll('.mode-btn').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === settings.timer.mode);
@@ -226,7 +226,6 @@ function renderSettings(state, isHost) {
   document.getElementById('dur-day').value = settings.timer.day;
   document.getElementById('dur-voting').value = settings.timer.voting;
 
-  // NEW: считаем занятые слоты со всеми ролями
   const rolesUsed = mafiaCount
     + (roles.don ? 1 : 0)
     + (roles.doctor ? 1 : 0)
@@ -262,9 +261,9 @@ function readSettingsFromForm() {
     roles: {
       doctor: document.getElementById('role-doctor').checked,
       detective: document.getElementById('role-detective').checked,
-      courtesan: document.getElementById('role-courtesan').checked, // NEW
-      don: document.getElementById('role-don').checked, // NEW
-      maniac: document.getElementById('role-maniac').checked, // NEW
+      courtesan: document.getElementById('role-courtesan').checked,
+      don: document.getElementById('role-don').checked, 
+      maniac: document.getElementById('role-maniac').checked,
     },
     timer: {
       mode,
@@ -311,7 +310,6 @@ document.querySelectorAll('.mode-btn').forEach((btn) => {
   document.getElementById(id).addEventListener('change', emitSettings);
 });
 
-// NEW: множественное число русского слова "голос"
 function pluralizeVotes(n) {
   const mod10 = n % 10;
   const mod100 = n % 100;
@@ -325,7 +323,7 @@ function renderGameScreen(state) {
     night: 'НОЧЬ',
     day: 'ДЕНЬ',
     voting: 'ГОЛОСОВАНИЕ',
-    lastword: 'ПОСЛЕДНЕЕ СЛОВО', // NEW
+    lastword: 'ПОСЛЕДНЕЕ СЛОВО',
     ended: 'ДЕЛО ЗАКРЫТО',
   };
   const labelEl = document.getElementById('phase-label');
@@ -333,7 +331,6 @@ function renderGameScreen(state) {
   labelEl.className = 'phase-label ' + (state.phase === 'night' ? 'night' : state.phase === 'voting' ? 'voting' : state.phase === 'lastword' ? 'lastword' : '');
 
   const roundBase = state.introDay ? 'Перед первой ночью' : `Раунд ${state.round}`;
-  // NEW: если идёт переголосование — уточняем это в подписи
   document.getElementById('phase-round').textContent =
     (state.phase === 'voting' && state.voteRound > 1) ? `${roundBase} · Переголосование ${state.voteRound - 1}` : roundBase;
 
@@ -359,8 +356,6 @@ function renderGameScreen(state) {
     advanceBtn.style.display = isHost && state.phase !== 'ended' ? 'inline-flex' : 'none';
   }
 
-  // NEW: сбрасываем "я уже походил" не только при смене общей фазы, но и при смене ночного хода
-  // (важно для дона — у него два разных хода за одну ночь)
   if (renderGameScreen.lastPhase !== state.phase || renderGameScreen.lastNightTurn !== state.nightTurn) {
     hasActedThisPhase = false;
     if (renderGameScreen.lastPhase !== state.phase) {
@@ -372,7 +367,6 @@ function renderGameScreen(state) {
     renderGameScreen.lastNightTurn = state.nightTurn;
   }
 
-  // находим тех, кто умер именно в этом апдейте — для анимации/звука
   const newlyEliminated = new Set();
   state.players.forEach((p) => {
     if (previousAliveById[p.id] === true && p.alive === false) newlyEliminated.add(p.id);
@@ -380,20 +374,19 @@ function renderGameScreen(state) {
   });
   if (newlyEliminated.size > 0) Sfx.elimination();
 
-  renderSpeakOrder(state); // NEW
+  renderSpeakOrder(state);
 
   const grid = document.getElementById('game-players');
   grid.innerHTML = '';
   state.players.forEach((p) => {
     const card = document.createElement('div');
-    const isLastWordTarget = state.phase === 'lastword' && p.id === state.lastWordTarget; // NEW
+    const isLastWordTarget = state.phase === 'lastword' && p.id === state.lastWordTarget;
     card.className = 'suspect-card'
       + (p.alive ? '' : ' is-dead')
       + (newlyEliminated.has(p.id) ? ' just-eliminated' : '')
       + (isLastWordTarget ? ' is-last-word' : '');
     card.dataset.id = p.id;
 
-    // NEW: видимость голосования — сколько голосов набрал и за кого сам проголосовал
     let voteBadge = '';
     let voteForTag = '';
     if (state.phase === 'voting' && state.dayVotes) {
@@ -443,7 +436,6 @@ function renderGameScreen(state) {
   renderActionPanel(state, me);
 }
 
-// NEW: панель с порядком выступления, сдвигается на +1 каждую ночь
 function renderSpeakOrder(state) {
   const bar = document.getElementById('speak-order-bar');
   if (!bar) return;
@@ -530,16 +522,16 @@ function renderActionPanel(state, me) {
       : (myRole === 'don' && state.nightTurn === 'don') ? 'Кого проверить на детектива?'
       : myRole === 'doctor' ? 'Выберите, кого спасти'
       : myRole === 'detective' ? 'Выберите, кого проверить'
-      : myRole === 'courtesan' ? 'Кого навестить этой ночью?' // NEW
-      : myRole === 'maniac' ? 'Выберите жертву' // NEW
+      : myRole === 'courtesan' ? 'Кого навестить этой ночью?'
+      : myRole === 'maniac' ? 'Выберите жертву'
       : 'Выберите цель';
     panel.innerHTML = `<h3>${heading}</h3>`;
     const list = document.createElement('div');
     list.className = 'suspects-grid';
     state.players.filter((p) => p.alive).forEach((p) => {
       if ((myRole === 'mafia' || myRole === 'don') && state.nightTurn === 'mafia' && p.id === me.id) return;
-      if (myRole === 'maniac' && p.id === me.id) return; // NEW: маньяк не убивает себя
-      if (myRole === 'courtesan' && p.id === me.id) return; // NEW: путана не навещает себя
+      if (myRole === 'maniac' && p.id === me.id) return;
+      if (myRole === 'courtesan' && p.id === me.id) return;
       const el = document.createElement('div');
       el.className = 'suspect-card is-selectable';
       el.innerHTML = `<div class="suspect-avatar">${renderAvatar(p.id, p.name)}</div><div class="suspect-name">${escapeHtml(p.name)}</div>`;
@@ -571,7 +563,6 @@ function renderActionPanel(state, me) {
       panel.innerHTML = '<h3>Голос принят</h3><p>Ждём остальных.</p>';
       return;
     }
-    // NEW: при переголосовании выбирать можно только среди тех, кто набрал поровну
     panel.innerHTML = state.voteRound > 1
       ? '<h3>Переголосование — за кого голосуем?</h3><p class="hint-text" style="margin:0 0 10px">Выбирайте среди тех, кто набрал поровну голосов.</p>'
       : '<h3>За кого голосуем?</h3>';
@@ -631,7 +622,7 @@ socket.on('detectiveResult', ({ name, isMafia }) => {
   panel.innerHTML = `<h3>Результат проверки</h3><p><strong>${escapeHtml(name)}</strong> — ${isMafia ? '<span style="color:var(--rose-bright)">состоит в мафии!</span>' : 'не связан с мафией.'}</p>`;
 });
 
-socket.on('donResult', ({ name, isDetective }) => { // NEW
+socket.on('donResult', ({ name, isDetective }) => {
   hasActedThisPhase = true;
   lastDonResult = { name, isDetective };
   const panel = document.getElementById('action-panel');
@@ -722,12 +713,12 @@ try {
 // ---------- Game over ----------
 socket.on('gameOver', ({ winner, revealed }) => {
   if (winner === 'town') Sfx.victory();
-  else if (winner === 'maniac') Sfx.defeat(); // NEW: маньяк побеждает — трактуем как поражение города
+  else if (winner === 'maniac') Sfx.defeat();
   else Sfx.defeat();
 
   const stampEl = document.getElementById('verdict-stamp');
   const verdictText = winner === 'mafia' ? 'МАФИЯ ПОБЕДИЛА'
-    : winner === 'maniac' ? 'ПОБЕДИЛ МАНЬЯК' // NEW
+    : winner === 'maniac' ? 'ПОБЕДИЛ МАНЬЯК'
     : 'ГОРОД СПАСЁН';
   stampEl.textContent = verdictText;
   stampEl.className = 'stamp' + (winner === 'town' ? ' role-town' : winner === 'maniac' ? ' role-maniac' : '');
@@ -738,7 +729,7 @@ socket.on('gameOver', ({ winner, revealed }) => {
   listEl.innerHTML = revealed.map((p) => {
     const info = ROLE_INFO[p.role] || ROLE_INFO.civilian;
     const cls = (p.role === 'mafia' || p.role === 'don') ? 'reveal-role-mafia'
-      : p.role === 'maniac' ? 'reveal-role-maniac' // NEW
+      : p.role === 'maniac' ? 'reveal-role-maniac'
       : 'reveal-role-town';
     return `<div>${escapeHtml(p.name)} — <span class="${cls}">${info.label}</span>${p.alive ? '' : ' (устранён)'}</div>`;
   }).join('');

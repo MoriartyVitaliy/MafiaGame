@@ -1,7 +1,7 @@
 // ---------- Кастомные портреты ----------
 // Ключ — никнейм в нижнем регистре (без пробелов по краям).
 const CUSTOM_AVATARS = {
-  // 'дядя толик': { hat: true, glasses: true, mustache: true, hue: 38, special: 'gold' },
+  // 'Нолик': { hat: true, glasses: true, mustache: true, hue: 38, special: 'gold' },
   // 'марина': { svg: '<svg viewBox="0 0 100 100">...</svg>' },
 };
 
@@ -78,7 +78,6 @@ function buildAvatarSVG(features, special) {
 </svg>`.trim();
 }
 
-// seed — стабильный id игрока (sessionId), name — ник
 function renderAvatar(seed, name) {
   const key = String(name || '').trim().toLowerCase();
   const custom = CUSTOM_AVATARS[key];
