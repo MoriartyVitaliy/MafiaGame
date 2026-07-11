@@ -1,0 +1,11 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6484:6484"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:
