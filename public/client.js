@@ -2,6 +2,7 @@ const socket = io();
 
 let previousAliveById = {};
 let notesTargetId = null;
+let ttsVoice = null;
 
 const ROLE_INFO = {
   mafia: {
@@ -84,6 +85,45 @@ document.getElementById('btn-notes-clear').addEventListener('click', () => {
 document.getElementById('btn-close-notes').addEventListener('click', () => {
   closeModal('notes-modal');
   notesTargetId = null;
+});
+
+function pickVoice() {
+  if (!('speechSynthesis' in window)) return;
+  const voices = speechSynthesis.getVoices();
+  ttsVoice = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('ru')) || voices[0] || null;
+}
+
+if ('speechSynthesis' in window) {
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
+}
+
+function speakAnnounce(text) {
+  if (!text || !('speechSynthesis' in window)) return;
+  if (Sfx.isMuted && Sfx.isMuted()) return;
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'ru-RU';
+  if (ttsVoice) utter.voice = ttsVoice;
+  utter.rate = 0.95;
+  utter.pitch = 0.85;
+  speechSynthesis.speak(utter);
+}
+
+function showAnnounceToast(text) {
+  const toast = document.createElement('div');
+  toast.className = 'announce-toast';
+  toast.textContent = text;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('on'));
+  setTimeout(() => {
+    toast.classList.remove('on');
+    setTimeout(() => toast.remove(), 400);
+  }, 3400);
+}
+
+socket.on('announce', (text) => {
+  showAnnounceToast(text);
+  speakAnnounce(text);
 });
 
 // ---------- устойчивая сессия для переживания перезагрузки ----------
