@@ -579,6 +579,15 @@ function renderActionPanel(state, me) {
       if ((myRole === 'mafia' || myRole === 'don') && state.nightTurn === 'mafia' && p.id === me.id) return;
       if (myRole === 'maniac' && p.id === me.id) return;
       if (myRole === 'courtesan' && p.id === me.id) return;
+      if (myRole === 'doctor' && state.doctorLastSaveId && p.id === state.doctorLastSaveId) {
+        const lastName = state.players.find((p) => p.id === state.doctorLastSaveId)?.name;
+        if (lastName) {
+          const hint = document.createElement('p');
+          hint.className = 'hint-text';
+          hint.style.margin = '0 0 10px';
+          hint.textContent = `Прошлой ночью вы спасли ${lastName} — сегодня его нельзя выбрать снова.`;
+          panel.appendChild(hint);
+        }}
       const el = document.createElement('div');
       el.className = 'suspect-card is-selectable';
       el.innerHTML = `<div class="suspect-avatar">${renderAvatar(p.id, p.name)}</div><div class="suspect-name">${escapeHtml(p.name)}</div>`;
@@ -794,6 +803,20 @@ socket.on('gameOver', ({ winner, revealed }) => {
 document.getElementById('btn-new-game').addEventListener('click', () => {
   clearSession();
   location.reload();
+});
+
+socket.on('nightActionError', ({ message }) => {
+  hasActedThisPhase = false;
+  if (!latestState) return;
+  const me = latestState.players.find((p) => p.id === mySessionId);
+  renderActionPanel(latestState, me);
+  const panel = document.getElementById('action-panel');
+  const warn = document.createElement('div');
+  warn.className = 'hint-text';
+  warn.style.color = 'var(--rose-bright)';
+  warn.style.margin = '0 0 10px';
+  warn.textContent = message;
+  panel.prepend(warn);
 });
 
 // ---------- Utils ----------

@@ -102,6 +102,7 @@ async function main() {
       voteRound: room.voteRound || 1,
       lastWordTarget: room.phase === 'lastword' ? room.lastWordTarget : null,
       speakOrder: room.speakOrder || null,
+      doctorLastSaveId: room.doctorLastSaveId || null,
       ...extra,
     });
   }
@@ -557,6 +558,7 @@ async function main() {
           voteRound: 1,
           lastWordTarget: null,
           speakOrder: null,
+          doctorLastSaveId: null,
           settings: {
             mafiaCount: 1,
             roles: { doctor: true, detective: true, courtesan: false, don: false, maniac: false },
@@ -647,6 +649,7 @@ async function main() {
         room.voteCandidates = null;
         room.voteRound = 1;
         room.lastWordTarget = null;
+        room.doctorLastSaveId = null;
         pushLog(room, 'Дело открыто. Роли распределены. Да начнётся расследование.');
 
         room.players.forEach((p) => {
@@ -711,27 +714,37 @@ async function main() {
             io.to(room.code).emit('announce', TURN_ANNOUNCE.mafiaEnd);
             await advanceNightTurn(room);
           }
-        } else if (player.role === 'don' && room.night.currentTurn === 'don') {
+        } 
+        else if (player.role === 'don' && room.night.currentTurn === 'don') {
           const target = findPlayerBySession(room, targetId);
           if (target) socket.emit('donResult', { targetId, name: target.name, isDetective: target.role === 'detective' });
           io.to(room.code).emit('announce', TURN_ANNOUNCE.donEnd);
-          await advanceNightTurn(room);
-        } else if (player.role === 'doctor') {
+          await advanceNightTurn(room);  
+        }
+        else if (player.role === 'doctor') {
+          if(room.doctorLastSaveId === targetId) {
+            socket.emit('actionAck', { message: 'Вы не можете спасти одного и того же участника в двух ночах подряд.' });
+            return;
+          }
           room.night.doctorSave = targetId;
+          room.doctorLastSaveId = targetId;
           socket.emit('actionAck', { message: 'Вы выбрали, кого спасти этой ночью.' });
           io.to(room.code).emit('announce', TURN_ANNOUNCE.doctorEnd);
           await advanceNightTurn(room);
-        } else if (player.role === 'detective') {
+        } 
+        else if (player.role === 'detective') {
           const target = findPlayerBySession(room, targetId);
           if (target) socket.emit('detectiveResult', { targetId, name: target.name, isMafia: MAFIA_FACTION_ROLES.includes(target.role) });
           io.to(room.code).emit('announce', TURN_ANNOUNCE.detectiveEnd);
           await advanceNightTurn(room);
-        } else if (player.role === 'courtesan') {
+        } 
+        else if (player.role === 'courtesan') {
           room.night.blockedSessionId = targetId;
           socket.emit('actionAck', { message: 'Вы навестили выбранного участника этой ночью.' });
           io.to(room.code).emit('announce', TURN_ANNOUNCE.courtesanEnd);
           await advanceNightTurn(room);
-        } else if (player.role === 'maniac') {
+        } 
+        else if (player.role === 'maniac') {
           room.night.maniacTarget = targetId;
           socket.emit('actionAck', { message: 'Вы выбрали свою жертву этой ночью.' });
           io.to(room.code).emit('announce', TURN_ANNOUNCE.maniacEnd);
