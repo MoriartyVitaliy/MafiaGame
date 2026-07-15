@@ -208,6 +208,14 @@ document.getElementById('btn-join').addEventListener('click', () => {
   socket.emit('joinRoom', { code, name: myName, sessionId: mySessionId });
 });
 
+document.getElementById('btn-leave-game').addEventListener('click', () => {
+  const confirmed = confirm('Покинуть расследование? Вернуться в эту игру будет нельзя.');
+  if (!confirmed) return;
+  clearSession();
+  socket.emit('leaveRoom', { code: myRoomCode });
+  location.reload();
+});
+
 socket.on('errorMsg', (msg) => {
   const waitingVisible = document.getElementById('screen-waiting').classList.contains('active');
   document.getElementById(waitingVisible ? 'waiting-error' : 'lobby-error').textContent = msg;
